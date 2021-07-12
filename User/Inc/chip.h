@@ -3,6 +3,8 @@
 
 #include "stm32f4xx_hal.h"
 
+#define CHIP_ERRORS_MAX   64
+
 typedef enum ChipReset_
 {
   chipReset,

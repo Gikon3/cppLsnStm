@@ -19,6 +19,7 @@ typedef enum Check_
 typedef enum Fsm_
 {
   stBegin,
+  stIdBlock,
   stErrorNum,
   stAddress,
   stError,
@@ -33,8 +34,8 @@ static DMA_HandleTypeDef* dmaRx;
 static osMessageQueueId_t qMessage;
 static int8_t initFl = 0;
 
-//static uint8_t msgBegin[]       = {0xF0, 0xDA, 0x1A, 0x1A};
-static uint8_t msgEnd[]         = {0xF0, 0xDA, 0x1B, 0x1B};
+//static uint8_t msgBegin[]       = {0xF0, 0xDA, 0x00, 0x00};
+static uint8_t msgEnd[]         = {0xF0, 0xDA, 0x0E, 0xFF};
 static uint8_t codeCheckFail[]  = {0xF0, 0xDA, 0x0F, 0x00};
 static uint8_t codeCheckHash[]  = {0xF0, 0xDA, 0x0F, 0x01};
 
@@ -76,7 +77,7 @@ void chip_rst_ctrl(ChipReset reset)
 
 static inline uint8_t* find_end(uint8_t const* buffer, uint8_t const* str, size_t size)
 {
-  return find_circular(buffer, SPI_BUFFER_SIZE, str, sizeof(msgEnd), msgEnd, sizeof(msgEnd));
+  return find_circular(buffer, SPI_BUFFER_SIZE, str, size, msgEnd, sizeof(msgEnd));
 }
 
 static inline Check check_hash(Vector const* msg, size_t id)
@@ -90,12 +91,17 @@ static inline Check check_message(Vector const* msg)
   size_t errorsNum = 0;
   size_t errorsCount = 0;
   for (size_t i = 0; i < msg->size; i += 4) {
-    uint32_t word = msg->data[i+3] << 24 | msg->data[i+2] << 16 | msg->data[i+1] << 8 | msg->data[i];
+    uint32_t word = msg->data[i] << 24 | msg->data[i+1] << 16 | msg->data[i+2] << 8 | msg->data[i+3];
 
     switch (state) {
       case stBegin:
-        if (word == opBegin) state = stErrorNum;
+        if (word == opStart) state = stBegin;
+        else if (word == opBegin) state = stIdBlock;
         else return checkFail;
+        break;
+      case stIdBlock:
+        if (word == opBegin || word == opEnd) return checkFail;
+        else state = stErrorNum;
         break;
       case stErrorNum:
         if (word == 0 || word == opStart) {
@@ -103,7 +109,7 @@ static inline Check check_message(Vector const* msg)
         }
         else {
           state = stAddress;
-          errorsNum = word;
+          errorsNum = word <= CHIP_ERRORS_MAX ? word : CHIP_ERRORS_MAX;
         }
         break;
       case stAddress:
@@ -118,7 +124,7 @@ static inline Check check_message(Vector const* msg)
           state = stAddress;
           ++errorsCount;
         }
-        else {
+        if (errorsCount == errorsNum) {
           state = stHash;
         }
         break;
@@ -127,7 +133,7 @@ static inline Check check_message(Vector const* msg)
         state = stEnd;
         break;
       case stEnd:
-        if (word != stEnd) return checkFail;
+        if (word != opEnd) return checkFail;
         break;
     }
   }
@@ -173,7 +179,10 @@ static inline uint8_t* msg_process(SPI_HandleTypeDef* spi, DMA_HandleTypeDef* dm
       }
       xQueueSendToBack(qMessage, &message, portMAX_DELAY);
 
-      if (status != checkOk) return spiBuffer;
+      if (status != checkOk) {
+        chip_config();
+        return spiBuffer;
+      }
 
       startPosition = endPosition;
       startFind = endPosition;
