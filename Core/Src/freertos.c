@@ -26,10 +26,13 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "queue.h"
 #include "vector_data.h"
+#include "usb_device.h"
+#include "stm_ctrl.h"
 #include "chip.h"
 #include "servo.h"
-#include "stm_ctrl.h"
+#include <math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -219,10 +222,10 @@ void MX_FREERTOS_Init(void) {
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
+  servo_config();
+  chip_config();
+  for(;;) {
+    osDelay(100);
   }
   /* USER CODE END StartDefaultTask */
 }
@@ -237,10 +240,9 @@ void StartDefaultTask(void *argument)
 void startTskSpiService(void *argument)
 {
   /* USER CODE BEGIN startTskSpiService */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
+  for(;;) {
+    chip_msg_proc();
+    osDelay(20 / portTICK_PERIOD_MS);
   }
   /* USER CODE END startTskSpiService */
 }
@@ -255,10 +257,32 @@ void startTskSpiService(void *argument)
 void startTskServoService(void *argument)
 {
   /* USER CODE BEGIN startTskServoService */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
+  static uint32_t delay = 100 / portTICK_PERIOD_MS;
+  int8_t rotateFl = 0;
+  float angle = 0;
+  float degreesPerSec = 0;
+  for(;;) {
+    uint32_t ticksTo = xTaskGetTickCount() + delay;
+    ServoControl ctrl;
+    TickType_t tickWait = rotateFl ? 0 : portMAX_DELAY;
+    if (xQueueReceive(qCmdServoHandle, &ctrl, tickWait) == pdTRUE) {
+      if (ctrl.cmd == servoAngle) {
+        rotateFl = 0;
+        servo_set_angle(ctrl.val);
+      }
+      else if (ctrl.cmd == servoRotate) {
+        rotateFl = 1;
+        degreesPerSec = ctrl.val;
+        angle = servo_angle();
+      }
+    }
+
+    if (rotateFl) {
+      float degreesPerFrame = degreesPerSec * delay / 1000;
+      angle = fmod(fabsf(angle + degreesPerFrame), 360);
+      servo_set_angle(angle);
+      osDelayUntil(ticksTo);
+    }
   }
   /* USER CODE END startTskServoService */
 }
@@ -273,10 +297,21 @@ void startTskServoService(void *argument)
 void startTskUsbTxData(void *argument)
 {
   /* USER CODE BEGIN startTskUsbTxData */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
+  for(;;) {
+    Vector txData = make_vector_sz(16);
+    Vector qTxData = make_vector();
+    xQueueReceive(qDataHandle, &qTxData, portMAX_DELAY);
+    vector_append_vct(&txData, &qTxData);
+    vector_free(&qTxData);
+
+    while (xQueueReceive(qDataHandle, &qTxData, 0) == pdTRUE) {
+      vector_append_vct(&txData, &qTxData);
+      vector_free(&qTxData);
+    }
+    usb_send_data(txData.data, txData.size);
+
+    osDelay(1000 / portTICK_PERIOD_MS);
+    vector_free(&txData);
   }
   /* USER CODE END startTskUsbTxData */
 }
@@ -291,10 +326,9 @@ void startTskUsbTxData(void *argument)
 void startTskUsbRxCmd(void *argument)
 {
   /* USER CODE BEGIN startTskUsbRxCmd */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
+  for(;;) {
+    ctrl_cmd_proc();
+    osDelay(100 / portTICK_PERIOD_MS);
   }
   /* USER CODE END startTskUsbRxCmd */
 }
@@ -309,10 +343,10 @@ void startTskUsbRxCmd(void *argument)
 void startTskUsbTxCmd(void *argument)
 {
   /* USER CODE BEGIN startTskUsbTxCmd */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
+  char angle[] = "#angle=172.0\r\n";
+  for(;;) {
+    usb_send_cmd((uint8_t*)angle, sizeof(angle) - 1);
+    osDelay(1000 / portTICK_PERIOD_MS);
   }
   /* USER CODE END startTskUsbTxCmd */
 }
