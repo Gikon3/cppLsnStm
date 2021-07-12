@@ -26,6 +26,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "rtc.h"
 #include "queue.h"
 #include "vector_data.h"
 #include "usb_device.h"
@@ -33,6 +34,7 @@
 #include "chip.h"
 #include "servo.h"
 #include <math.h>
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -93,7 +95,7 @@ const osThreadAttr_t tskUsbRxCmd_attributes = {
 osThreadId_t tskUsbTxCmdHandle;
 const osThreadAttr_t tskUsbTxCmd_attributes = {
   .name = "tskUsbTxCmd",
-  .stack_size = 128 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for qData */
@@ -262,7 +264,7 @@ void startTskServoService(void *argument)
   float angle = 0;
   float degreesPerSec = 0;
   for(;;) {
-    uint32_t ticksTo = xTaskGetTickCount() + delay;
+    uint32_t startTicks = xTaskGetTickCount() + delay;
     ServoControl ctrl;
     TickType_t tickWait = rotateFl ? 0 : portMAX_DELAY;
     if (xQueueReceive(qCmdServoHandle, &ctrl, tickWait) == pdTRUE) {
@@ -281,7 +283,7 @@ void startTskServoService(void *argument)
       float degreesPerFrame = degreesPerSec * delay / 1000;
       angle = fmod(fabsf(angle + degreesPerFrame), 360);
       servo_set_angle(angle);
-      osDelayUntil(ticksTo);
+      osDelayUntil(startTicks);
     }
   }
   /* USER CODE END startTskServoService */
@@ -343,9 +345,16 @@ void startTskUsbRxCmd(void *argument)
 void startTskUsbTxCmd(void *argument)
 {
   /* USER CODE BEGIN startTskUsbTxCmd */
-  char angle[] = "#angle=172.0\r\n";
+  char cmdResponse[36];
+  RTC_TimeTypeDef time;
   for(;;) {
-    usb_send_cmd((uint8_t*)angle, sizeof(angle) - 1);
+    HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN);
+    HAL_RTC_GetDate(&hrtc, NULL, RTC_FORMAT_BIN);
+    size_t seconds = time.Hours * 3600 + time.Minutes * 60 + time.Seconds;
+    int lenCmd = snprintf(cmdResponse, sizeof(cmdResponse),
+                          "#time=%u\r\n#angle=%3.2f\r\n",
+                          seconds, servo_angle());
+    usb_send_cmd((uint8_t*)cmdResponse, lenCmd);
     osDelay(1000 / portTICK_PERIOD_MS);
   }
   /* USER CODE END startTskUsbTxCmd */

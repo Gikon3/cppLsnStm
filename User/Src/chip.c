@@ -33,6 +33,8 @@ static SPI_HandleTypeDef* spi;
 static DMA_HandleTypeDef* dmaRx;
 static osMessageQueueId_t qMessage;
 static int8_t initFl = 0;
+static int8_t reconfigEnableFl = 0;
+static int8_t pendingRecofig = 0;
 
 //static uint8_t msgBegin[]       = {0xF0, 0xDA, 0x00, 0x00};
 static uint8_t msgEnd[]         = {0xF0, 0xDA, 0x0E, 0xFF};
@@ -52,7 +54,7 @@ static inline void chip_init()
   initFl = 1;
 }
 
-void chip_config()
+void chip_config_force()
 {
   chip_init();
   chip_rst_ctrl(chipReset);
@@ -60,6 +62,13 @@ void chip_config()
   HAL_SPI_Receive_DMA(spi, dmaSpi3Buffer, SPI_BUFFER_SIZE);
   osDelay(10 / portTICK_PERIOD_MS);
   chip_rst_ctrl(chipUnreset);
+}
+
+void chip_config()
+{
+  if (reconfigEnableFl == chipReconfNo) return;
+
+  chip_config_force();
 }
 
 void chip_rst_ctrl(ChipReset reset)
@@ -179,8 +188,10 @@ static inline uint8_t* msg_process(SPI_HandleTypeDef* spi, DMA_HandleTypeDef* dm
       }
       xQueueSendToBack(qMessage, &message, portMAX_DELAY);
 
-      if (status != checkOk) {
-        chip_config();
+      if (status != checkOk || pendingRecofig) {
+        pendingRecofig = 0;
+        if (!pendingRecofig) chip_config();
+        else chip_config_force();
         return spiBuffer;
       }
 
@@ -200,4 +211,14 @@ void chip_msg_proc()
     bufferPoint = msg_process(spi, dmaRx, dmaSpi3Buffer, SPI_BUFFER_SIZE, bufferPoint,
                               find_end, check_message);
   }
+}
+
+void chip_reconfig_ctrl(ChipReconfig ctrl)
+{
+  reconfigEnableFl = ctrl;
+}
+
+void chip_reconfig()
+{
+  pendingRecofig = 1;
 }

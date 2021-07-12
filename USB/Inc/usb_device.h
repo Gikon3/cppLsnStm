@@ -40,7 +40,7 @@ int usb_send_data(uint8_t* buf, int32_t len);
 int usb_recv_data(uint8_t* buf, int32_t len);
 
 #define USB_BUFFER_SIZE 512
-extern uint8_t usbCmdBuffer[USB_BUFFER_SIZE];
+extern char usbCmdBuffer[USB_BUFFER_SIZE];
 
 #ifdef __cplusplus
 }

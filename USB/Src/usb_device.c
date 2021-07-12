@@ -3,7 +3,7 @@
 #include "cdc_cmd.h"
 #include "cdc_data.h"
 
-uint8_t usbCmdBuffer[USB_BUFFER_SIZE];
+char usbCmdBuffer[USB_BUFFER_SIZE];
 
 const USBD_DescriptionType hdev_cfg = {
   .Vendor = {
