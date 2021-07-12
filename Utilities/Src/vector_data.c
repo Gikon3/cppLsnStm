@@ -94,10 +94,10 @@ void vector_append_ar(Vector* vec, uint8_t const* begin, uint8_t const* end)
 
   size_t requiredSize = vec->size + sizeAppend;
   if (requiredSize > vec->allocSize) {
-    size_t newAllocSize = 0;
+    size_t newAllocSize = vec->allocSize;
     do {
-      newAllocSize = vec->allocSize * 2;
-    } while (newAllocSize >= requiredSize);
+      newAllocSize *= 2;
+    } while (newAllocSize < requiredSize);
     vector_resize(vec, newAllocSize);
   }
 
@@ -111,10 +111,10 @@ void vector_append_vct(Vector* vec, Vector const* src)
 
   size_t requiredSize = vec->size + src->size;
   if (requiredSize > vec->allocSize) {
-    size_t newAllocSize = 0;
+    size_t newAllocSize = vec->allocSize;
     do {
-      newAllocSize = vec->allocSize * 2;
-    } while (newAllocSize >= requiredSize);
+      newAllocSize *= 2;
+    } while (newAllocSize < requiredSize);
     vector_resize(vec, newAllocSize);
   }
 
