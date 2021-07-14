@@ -174,8 +174,8 @@ static inline uint8_t* msg_process(SPI_HandleTypeDef* spi, DMA_HandleTypeDef* dm
       if (status == checkOk) {
         uint8_t angleCode[4] = { 0 };
         uint16_t angle = servo_angle();
-        angleCode[1] = angle >> 8;
-        angleCode[0] = angle;
+        angleCode[2] = angle >> 8;
+        angleCode[3] = angle;
         vector_append_ar(&message, angleCode, &angleCode[sizeof(angleCode)]);
       }
       else if (status == checkFail) {
