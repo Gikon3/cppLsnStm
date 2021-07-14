@@ -345,15 +345,16 @@ void startTskUsbRxCmd(void *argument)
 void startTskUsbTxCmd(void *argument)
 {
   /* USER CODE BEGIN startTskUsbTxCmd */
-  char cmdResponse[36];
+  char cmdResponse[64];
   RTC_TimeTypeDef time;
   for(;;) {
     HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN);
     HAL_RTC_GetDate(&hrtc, NULL, RTC_FORMAT_BIN);
     size_t seconds = time.Hours * 3600 + time.Minutes * 60 + time.Seconds;
+    int8_t reconfigEnable = chip_reconfig_enable() == chipReconfNo ? 0 : 1;
     int lenCmd = snprintf(cmdResponse, sizeof(cmdResponse),
-                          "#time=%u\r\n#angle=%3.2f\r\n",
-                          seconds, servo_angle());
+                          "#time=%u\r\n#angle=%3.2f\r\n#reconfigenable=%1d\r\n",
+                          seconds, servo_angle(), reconfigEnable);
     usb_send_cmd((uint8_t*)cmdResponse, lenCmd);
     osDelay(1000 / portTICK_PERIOD_MS);
   }

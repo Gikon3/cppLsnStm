@@ -33,7 +33,7 @@ static SPI_HandleTypeDef* spi;
 static DMA_HandleTypeDef* dmaRx;
 static osMessageQueueId_t qMessage;
 static int8_t initFl = 0;
-static int8_t reconfigEnableFl = 0;
+static ChipReconfig reconfigEnableFl = chipReconfYes;
 static int8_t pendingRecofig = 0;
 
 //static uint8_t msgBegin[]       = {0xF0, 0xDA, 0x00, 0x00};
@@ -216,6 +216,11 @@ void chip_msg_proc()
 void chip_reconfig_ctrl(ChipReconfig ctrl)
 {
   reconfigEnableFl = ctrl;
+}
+
+ChipReconfig chip_reconfig_enable()
+{
+  return reconfigEnableFl;
 }
 
 void chip_reconfig()

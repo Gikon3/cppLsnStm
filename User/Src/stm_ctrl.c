@@ -41,8 +41,8 @@ static inline void data_process(String const* cmd)
     servo.val = atof(rotatePos);
     xQueueSendToBack(qCmdServoHandle, &servo, portMAX_DELAY);
   }
-  else if ((pos = strstr(cmd->data, "chipreconfig="))) {
-    char* chipResetPos = pos + sizeof("chipreconfig=") - 1;
+  else if ((pos = strstr(cmd->data, "reconfigenable="))) {
+    char* chipResetPos = pos + sizeof("reconfigenable=") - 1;
     if (*chipResetPos == 'y' && *(chipResetPos+1) == 'e' && *(chipResetPos+2) == 's') {
       chip_reconfig_ctrl(chipReconfYes);
     }
