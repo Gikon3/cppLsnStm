@@ -259,29 +259,48 @@ void startTskSpiService(void *argument)
 void startTskServoService(void *argument)
 {
   /* USER CODE BEGIN startTskServoService */
+  typedef enum RoatateDir_
+  {
+    dirNone,
+    dirAnticlockwise,
+    dirClockwise
+  } RoatateDir;
   static uint32_t delay = 100 / portTICK_PERIOD_MS;
-  int8_t rotateFl = 0;
+  RoatateDir rotateFl = dirNone;
   float angle = 0;
   float degreesPerSec = 0;
   for(;;) {
     uint32_t startTicks = xTaskGetTickCount() + delay;
     ServoControl ctrl;
-    TickType_t tickWait = rotateFl ? 0 : portMAX_DELAY;
+    TickType_t tickWait = rotateFl != dirNone ? 0 : portMAX_DELAY;
     if (xQueueReceive(qCmdServoHandle, &ctrl, tickWait) == pdTRUE) {
       if (ctrl.cmd == servoAngle) {
-        rotateFl = 0;
+        rotateFl = dirNone;
         servo_set_angle(ctrl.val);
       }
       else if (ctrl.cmd == servoRotate) {
-        rotateFl = 1;
-        degreesPerSec = ctrl.val;
+        rotateFl = rotateFl == dirNone ? dirAnticlockwise : rotateFl;
+        degreesPerSec = fabsf(ctrl.val);
         angle = servo_angle();
+        continue;
       }
     }
 
-    if (rotateFl) {
-      float degreesPerFrame = degreesPerSec * delay / 1000;
-      angle = fmod(fabsf(angle + degreesPerFrame), 360);
+    if (rotateFl != dirNone) {
+      const int8_t rotateCoef = rotateFl == dirAnticlockwise ? 1 : -1;
+      double degreesPerFrame = degreesPerSec / 1000.0 * delay;
+      double mod360 = fmod(angle + rotateCoef * degreesPerFrame, 360);
+      if (mod360 > 270.0 && rotateFl == dirAnticlockwise) {
+        rotateFl = dirClockwise;
+        angle = 270.0;
+      }
+      else if (mod360 < 0.0 && rotateFl == dirClockwise) {
+        rotateFl = dirAnticlockwise;
+        angle = 0.0;
+      }
+      else {
+        angle = mod360;
+      }
       servo_set_angle(angle);
       osDelayUntil(startTicks);
     }

@@ -3,9 +3,10 @@
 #include <math.h>
 
 static int8_t initFl = 0;
-static float step = 2.777;
+static double step = (2500 - 500) / 270.0; // pulseRange / 270
 static TIM_HandleTypeDef* timer;
 static uint32_t channel;
+static const uint32_t zeroPoint = 499;
 
 static inline void init()
 {
@@ -23,7 +24,10 @@ void servo_config()
 void servo_set_angle(float val)
 {
   if (initFl) {
-    uint32_t pwm = fmod(fabsf(val), 360) * step + 999;
+    double mod360 = fmod(val, 360);
+    double angle = mod360 >= 0 ? mod360 : 360.0 + mod360;
+    if (angle > 270.0) angle = 270.0;
+    uint32_t pwm = angle * step + zeroPoint;
     __HAL_TIM_SET_COMPARE(timer, channel, pwm);
   }
 }
@@ -32,7 +36,7 @@ float servo_angle()
 {
   if (initFl) {
     uint32_t pwm = __HAL_TIM_GET_COMPARE(timer, channel);
-    return (pwm - 999) / step;
+    return (pwm - zeroPoint) / step;
   }
   return 0.0;
 }
