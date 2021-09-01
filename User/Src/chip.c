@@ -13,8 +13,8 @@ extern osMessageQueueId_t qDataHandle;
 typedef enum Check_
 {
   checkOk,
-  checkFail,
-  checkHash
+  checkOrderFail,
+  checkHashFail
 } Check;
 typedef enum Fsm_
 {
@@ -89,9 +89,17 @@ static inline uint8_t* find_end(uint8_t const* buffer, uint8_t const* str, size_
   return find_circular(buffer, SPI_BUFFER_SIZE, str, size, msgEnd, sizeof(msgEnd));
 }
 
-static inline Check check_hash(Vector const* msg, size_t id)
+static inline Check check_hash(Vector const* msg)
 {
-  return checkOk;
+  const size_t size = msg->size - 8;
+  const uint32_t hash = msg->data[size] << 24 | msg->data[size+1] << 16 | msg->data[size+2] << 8 | msg->data[size+3];
+  uint32_t calcHash = 0;
+  for (size_t i = 0; i < size; i += 4) {
+    const uint32_t word = msg->data[i] << 24 | msg->data[i+1] << 16 | msg->data[i+2] << 8 | msg->data[i+3];
+    calcHash ^= word;
+  }
+  if (calcHash == hash) return checkOk;
+  return checkHashFail;
 }
 
 static inline Check check_message(Vector const* msg)
@@ -106,10 +114,10 @@ static inline Check check_message(Vector const* msg)
       case stBegin:
         if (word == opStart) state = stBegin;
         else if (word == opBegin) state = stIdBlock;
-        else return checkFail;
+        else return checkOrderFail;
         break;
       case stIdBlock:
-        if (word == opBegin || word == opEnd) return checkFail;
+        if (word == opBegin || word == opEnd) return checkOrderFail;
         else state = stErrorNum;
         break;
       case stErrorNum:
@@ -122,12 +130,12 @@ static inline Check check_message(Vector const* msg)
         }
         break;
       case stAddress:
-        if (word == opBegin || word == opEnd) return checkFail;
+        if (word == opBegin || word == opEnd) return checkOrderFail;
         else state = stError;
         break;
       case stError:
         if (word == opBegin || word == opEnd) {
-          return checkFail;
+          return checkOrderFail;
         }
         else if (errorsCount < errorsNum) {
           state = stAddress;
@@ -138,11 +146,11 @@ static inline Check check_message(Vector const* msg)
         }
         break;
       case stHash:
-        if (check_hash(msg, i) != checkOk) return checkHash;
+        if (check_hash(msg) != checkOk) return checkHashFail;
         state = stEnd;
         break;
       case stEnd:
-        if (word != opEnd) return checkFail;
+        if (word != opEnd) return checkOrderFail;
         break;
     }
   }
@@ -178,11 +186,11 @@ static inline uint8_t* msg_process(SPI_HandleTypeDef* spi, DMA_HandleTypeDef* dm
         angleCode[3] = angle;
         vector_append_ar(&message, angleCode, &angleCode[sizeof(angleCode)]);
       }
-      else if (status == checkFail) {
+      else if (status == checkOrderFail) {
         vector_free(&message);
         message = make_vector_ar(codeCheckFail, &codeCheckFail[sizeof(codeCheckFail)]);
       }
-      else if (status == checkHash) {
+      else if (status == checkHashFail) {
         vector_free(&message);
         message = make_vector_ar(codeCheckHash, &codeCheckHash[sizeof(codeCheckHash)]);
       }
