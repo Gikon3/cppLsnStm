@@ -8,13 +8,17 @@
 #include "queue.h"
 #include <string.h>
 
+#define SILENCE_THR   (500 / portTICK_PERIOD_MS)
+
 extern osMessageQueueId_t qDataHandle;
 
 typedef enum Check_
 {
   checkOk,
   checkOrderFail,
-  checkHashFail
+  checkHashFail,
+  checkTimeFail,
+  checkNone
 } Check;
 typedef enum Fsm_
 {
@@ -36,10 +40,10 @@ static int8_t initFl = 0;
 static ChipReconfig reconfigEnableFl = chipReconfYes;
 static int8_t pendingReconfig = 0;
 
-//static uint8_t msgBegin[]       = {0xF0, 0xDA, 0x00, 0x00};
 static uint8_t msgEnd[]         = {0xF0, 0xDA, 0x0E, 0xFF};
 static uint8_t codeOrderFail[]  = {0xF0, 0xDA, 0x0F, 0x00};
 static uint8_t codeHashFail[]  = {0xF0, 0xDA, 0x0F, 0x01};
+static uint8_t codeSilence[]  = {0xF0, 0xDA, 0x0F, 0x02};
 
 static uint32_t opBegin = 0xF0DA0000;
 static uint32_t opEnd   = 0xF0DA0EFF;
@@ -67,7 +71,6 @@ void chip_config_force()
 void chip_config()
 {
   if (reconfigEnableFl == chipReconfNo) return;
-
   chip_config_force();
 }
 
@@ -78,11 +81,6 @@ void chip_rst_ctrl(ChipReset reset)
     case chipUnreset: HAL_GPIO_WritePin(CPP_nRST_POR_GPIO_Port, CPP_nRST_POR_Pin, GPIO_PIN_SET); break;
   }
 }
-
-//static inline uint8_t* find_begin(uint8_t const* buffer, uint8_t const* str, size_t size)
-//{
-//  return find_circular(buffer, SPI_BUFFER_SIZE, str, sizeof(msgBegin), msgBegin, sizeof(msgBegin));
-//}
 
 static inline uint8_t* find_end(uint8_t const* buffer, uint8_t const* str, size_t size)
 {
@@ -162,6 +160,9 @@ static inline uint8_t* msg_process(SPI_HandleTypeDef* spi, DMA_HandleTypeDef* dm
                                   uint8_t* spiBuffer, size_t spiBufferSize, uint8_t* bufferPoint,
                                   find_fp_t find_end_fp, check_fp_t check_fp)
 {
+  static TickType_t lastMsgTime = 0;
+  if (lastMsgTime == 0) lastMsgTime = xTaskGetTickCount();
+
   size_t dmaRxSize = spiBufferSize - dmaRx->Instance->NDTR;
   uint8_t* endRxDmaBuffer = spiBuffer + dmaRxSize;
   size_t lenRxData = (endRxDmaBuffer >= bufferPoint) ? endRxDmaBuffer - bufferPoint:
@@ -172,13 +173,16 @@ static inline uint8_t* msg_process(SPI_HandleTypeDef* spi, DMA_HandleTypeDef* dm
   uint8_t* startFind = bufferPoint;
   size_t lenTail = lenRxData;
 
+  Check status = checkNone;
+
   while (1) {
     endPosition = find_end_fp(spiBuffer, startFind, lenTail);
     if (endPosition) {
+      lastMsgTime = xTaskGetTickCount();
       Vector message = make_vector_buf_circ(spiBuffer, spiBufferSize, startPosition, endPosition);
       lenTail -= message.size;
 
-      Check status = check_fp(&message);
+      status = check_fp(&message);
       if (status == checkOk) {
         uint8_t angleCode[4] = { 0 };
         uint16_t angle = servo_angle();
@@ -196,17 +200,25 @@ static inline uint8_t* msg_process(SPI_HandleTypeDef* spi, DMA_HandleTypeDef* dm
       }
       xQueueSendToBack(qMessage, &message, portMAX_DELAY);
 
-      if (status != checkOk || pendingReconfig) {
-        pendingReconfig = 0;
-        if (!pendingReconfig) chip_config();
-        else chip_config_force();
-        return spiBuffer;
-      }
-
       startPosition = endPosition;
       startFind = endPosition;
-      continue;
+
+      if (status == checkOk) continue;
     }
+    else if (xTaskGetTickCount() - lastMsgTime > SILENCE_THR) {
+      lastMsgTime = xTaskGetTickCount();
+      Vector message = make_vector_ar(codeSilence, &codeSilence[sizeof(codeSilence)]);
+      xQueueSendToBack(qMessage, &message, portMAX_DELAY);
+      status = checkTimeFail;
+    }
+
+    if (status != checkOk || pendingReconfig) {
+      if (!pendingReconfig) chip_config();
+      else chip_config_force();
+      pendingReconfig = 0;
+      return spiBuffer;
+    }
+
     break;
   }
   return startFind;
