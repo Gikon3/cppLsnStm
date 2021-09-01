@@ -34,12 +34,12 @@ static DMA_HandleTypeDef* dmaRx;
 static osMessageQueueId_t qMessage;
 static int8_t initFl = 0;
 static ChipReconfig reconfigEnableFl = chipReconfYes;
-static int8_t pendingRecofig = 0;
+static int8_t pendingReconfig = 0;
 
 //static uint8_t msgBegin[]       = {0xF0, 0xDA, 0x00, 0x00};
 static uint8_t msgEnd[]         = {0xF0, 0xDA, 0x0E, 0xFF};
-static uint8_t codeCheckFail[]  = {0xF0, 0xDA, 0x0F, 0x00};
-static uint8_t codeCheckHash[]  = {0xF0, 0xDA, 0x0F, 0x01};
+static uint8_t codeOrderFail[]  = {0xF0, 0xDA, 0x0F, 0x00};
+static uint8_t codeHashFail[]  = {0xF0, 0xDA, 0x0F, 0x01};
 
 static uint32_t opBegin = 0xF0DA0000;
 static uint32_t opEnd   = 0xF0DA0EFF;
@@ -188,17 +188,17 @@ static inline uint8_t* msg_process(SPI_HandleTypeDef* spi, DMA_HandleTypeDef* dm
       }
       else if (status == checkOrderFail) {
         vector_free(&message);
-        message = make_vector_ar(codeCheckFail, &codeCheckFail[sizeof(codeCheckFail)]);
+        message = make_vector_ar(codeOrderFail, &codeOrderFail[sizeof(codeOrderFail)]);
       }
       else if (status == checkHashFail) {
         vector_free(&message);
-        message = make_vector_ar(codeCheckHash, &codeCheckHash[sizeof(codeCheckHash)]);
+        message = make_vector_ar(codeHashFail, &codeHashFail[sizeof(codeHashFail)]);
       }
       xQueueSendToBack(qMessage, &message, portMAX_DELAY);
 
-      if (status != checkOk || pendingRecofig) {
-        pendingRecofig = 0;
-        if (!pendingRecofig) chip_config();
+      if (status != checkOk || pendingReconfig) {
+        pendingReconfig = 0;
+        if (!pendingReconfig) chip_config();
         else chip_config_force();
         return spiBuffer;
       }
@@ -233,5 +233,5 @@ ChipReconfig chip_reconfig_enable()
 
 void chip_reconfig()
 {
-  pendingRecofig = 1;
+  pendingReconfig = 1;
 }
