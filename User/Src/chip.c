@@ -40,10 +40,10 @@ static int8_t initFl = 0;
 static ChipReconfig reconfigEnableFl = chipReconfYes;
 static int8_t pendingReconfig = 0;
 
-static uint8_t msgEnd[]         = {0xF0, 0xDA, 0x0E, 0xFF};
-static uint8_t codeOrderFail[]  = {0xF0, 0xDA, 0x0F, 0x00};
+static uint8_t msgEnd[]        = {0xF0, 0xDA, 0x0E, 0xFF};
+static uint8_t codeOrderFail[] = {0xF0, 0xDA, 0x0F, 0x00};
 static uint8_t codeHashFail[]  = {0xF0, 0xDA, 0x0F, 0x01};
-static uint8_t codeSilence[]  = {0xF0, 0xDA, 0x0F, 0x02};
+static uint8_t codeSilence[]   = {0xF0, 0xDA, 0x0F, 0x02};
 
 static uint32_t opBegin = 0xF0DA0000;
 static uint32_t opEnd   = 0xF0DA0EFF;
@@ -94,10 +94,11 @@ static inline Check check_hash(Vector const* msg)
   uint32_t calcHash = 0;
   for (size_t i = 0; i < size; i += 4) {
     const uint32_t word = msg->data[i] << 24 | msg->data[i+1] << 16 | msg->data[i+2] << 8 | msg->data[i+3];
+    if (word == opStart) continue;
     calcHash ^= word;
   }
-  if (calcHash == hash) return checkOk;
-  return checkHashFail;
+  if (calcHash != hash) return checkHashFail;
+  return checkOk;
 }
 
 static inline Check check_message(Vector const* msg)
