@@ -28,29 +28,29 @@ static inline void data_process(String const* cmd)
 {
   char* pos = NULL;
   if ((pos = strstr(cmd->data, "angle="))) {
-    char* anglePos = pos + sizeof("angle=") - 1;
+    char const* anglePos = pos + sizeof("angle=") - 1;
     ServoControl servo;
     servo.cmd = servoAngle;
     servo.val = atof(anglePos);
     xQueueSendToBack(qCmdServoHandle, &servo, portMAX_DELAY);
   }
   else if ((pos = strstr(cmd->data, "rotate="))) {
-    char* rotatePos = pos + sizeof("rotate=") - 1;
+    char const* rotatePos = pos + sizeof("rotate=") - 1;
     ServoControl servo;
     servo.cmd = servoRotate;
     servo.val = atof(rotatePos);
     xQueueSendToBack(qCmdServoHandle, &servo, portMAX_DELAY);
   }
-  else if ((pos = strstr(cmd->data, "reconfigenable="))) {
-    char* chipResetPos = pos + sizeof("reconfigenable=") - 1;
-    if (*chipResetPos == 'y' && *(chipResetPos+1) == 'e' && *(chipResetPos+2) == 's') {
+  else if ((pos = strstr(cmd->data, "autoreset="))) {
+    char const* autoResetPos = pos + sizeof("autoreset=") - 1;
+    if (!memcmp(autoResetPos, "yes", 3)) {
       chip_reconfig_ctrl(chipReconfYes);
     }
-    else if (*chipResetPos == 'n' && *(chipResetPos+1) == 'o') {
+    else if (!memcmp(autoResetPos, "no", 2)) {
       chip_reconfig_ctrl(chipReconfNo);
     }
   }
-  else if (strstr(cmd->data, "chipreconfig")) {
+  else if (strstr(cmd->data, "reset")) {
     chip_reconfig();
   }
 }

@@ -372,10 +372,10 @@ void startTskUsbTxCmd(void *argument)
     size_t seconds = time.Hours * 3600 + time.Minutes * 60 + time.Seconds;
     int8_t reconfigEnable = chip_reconfig_enable() == chipReconfNo ? 0 : 1;
     int lenCmd = snprintf(cmdResponse, sizeof(cmdResponse),
-                          "#time=%u\r\n#angle=%3.2f\r\n#reconfigenable=%1d\r\n",
+                          "#time=%u\r\n#angle=%3.2f\r\n#autoreset=%1d\r\n",
                           seconds, servo_angle(), reconfigEnable);
     usb_send_cmd((uint8_t*)cmdResponse, lenCmd);
-    osDelay(1000 / portTICK_PERIOD_MS);
+    osDelay(500 / portTICK_PERIOD_MS);
   }
   /* USER CODE END startTskUsbTxCmd */
 }
