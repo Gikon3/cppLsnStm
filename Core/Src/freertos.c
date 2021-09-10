@@ -39,7 +39,11 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+typedef enum {
+  dirNone,
+  dirAnticlockwise,
+  dirClockwise
+} RoatateDir;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -54,7 +58,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-
+static RoatateDir rotateFl = dirNone;
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -260,13 +264,7 @@ void startTskSpiService(void *argument)
 void startTskServoService(void *argument)
 {
   /* USER CODE BEGIN startTskServoService */
-  typedef enum {
-    dirNone,
-    dirAnticlockwise,
-    dirClockwise
-  } RoatateDir;
   static uint32_t delay = 100 / portTICK_PERIOD_MS;
-  RoatateDir rotateFl = dirNone;
   float angle = 0;
   float degreesPerSec = 0;
   for(;;) {
@@ -368,9 +366,10 @@ void startTskUsbTxCmd(void *argument)
     HAL_RTC_GetDate(&hrtc, NULL, RTC_FORMAT_BIN);
     size_t seconds = time.Hours * 3600 + time.Minutes * 60 + time.Seconds;
     int8_t reconfigEnable = chip_reconfig_enable() == chipReconfNo ? 0 : 1;
+    int8_t mode = rotateFl == dirNone ? 0 : 1;
     int lenCmd = snprintf(cmdResponse, sizeof(cmdResponse),
-                          "#time=%u\r\n#angle=%3.2f\r\n#autoreset=%1d\r\n",
-                          seconds, servo_angle(), reconfigEnable);
+                          "#time=%u\r\n#angle=%3.2f\r\n#autoreset=%1d\r\n#mode=%1d\r\n",
+                          seconds, servo_angle(), reconfigEnable, mode);
     usb_send_cmd((uint8_t*)cmdResponse, lenCmd);
     osDelay(500 / portTICK_PERIOD_MS);
   }
