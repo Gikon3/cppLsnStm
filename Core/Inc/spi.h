@@ -35,7 +35,7 @@ extern SPI_HandleTypeDef hspi3;
 extern SPI_HandleTypeDef hspi4;
 
 /* USER CODE BEGIN Private defines */
-#define SPI_BUFFER_SIZE 2048
+#define SPI_BUFFER_SIZE 20480
 /* USER CODE END Private defines */
 
 void MX_SPI3_Init(void);
@@ -43,9 +43,9 @@ void MX_SPI4_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 extern DMA_HandleTypeDef hdma_spi3_rx;
-extern DMA_HandleTypeDef hdma_spi4_rx;
+//extern DMA_HandleTypeDef hdma_spi4_rx;
 extern uint8_t dmaSpi3Buffer[SPI_BUFFER_SIZE];
-extern uint8_t dmaSpi4Buffer[SPI_BUFFER_SIZE];
+//extern uint8_t dmaSpi4Buffer[SPI_BUFFER_SIZE];
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

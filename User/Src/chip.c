@@ -12,16 +12,14 @@
 
 extern osMessageQueueId_t qDataHandle;
 
-typedef enum Check_
-{
+typedef enum {
   checkOk,
   checkOrderFail,
   checkHashFail,
   checkTimeFail,
   checkNone
 } Check;
-typedef enum Fsm_
-{
+typedef enum {
   stBegin,
   stIdBlock,
   stErrorNum,
@@ -37,7 +35,7 @@ static SPI_HandleTypeDef* spi;
 static DMA_HandleTypeDef* dmaRx;
 static osMessageQueueId_t qMessage;
 static int8_t initFl = 0;
-static ChipReconfig reconfigEnableFl = chipReconfYes;
+static ChipReconfig autoReconfigFl = chipReconfYes;
 static int8_t pendingReconfig = 0;
 
 static uint8_t msgEnd[]        = {0xF0, 0xDA, 0x0E, 0xFF};
@@ -70,7 +68,7 @@ void chip_config_force()
 
 void chip_config()
 {
-  if (reconfigEnableFl == chipReconfNo) return;
+  if (autoReconfigFl == chipReconfNo) return;
   chip_config_force();
 }
 
@@ -213,15 +211,17 @@ static inline uint8_t* msg_process(SPI_HandleTypeDef* spi, DMA_HandleTypeDef* dm
       status = checkTimeFail;
     }
 
-    if (status != checkOk || pendingReconfig) {
+    if ((status != checkNone && status != checkOk) || pendingReconfig) {
       if (!pendingReconfig) chip_config();
       else chip_config_force();
       pendingReconfig = 0;
+
       return spiBuffer;
     }
 
     break;
   }
+
   return startFind;
 }
 
@@ -236,12 +236,12 @@ void chip_msg_proc()
 
 void chip_reconfig_ctrl(ChipReconfig ctrl)
 {
-  reconfigEnableFl = ctrl;
+  autoReconfigFl = ctrl;
 }
 
 ChipReconfig chip_reconfig_enable()
 {
-  return reconfigEnableFl;
+  return autoReconfigFl;
 }
 
 void chip_reconfig()

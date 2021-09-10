@@ -22,7 +22,7 @@
 
 /* USER CODE BEGIN 0 */
 uint8_t dmaSpi3Buffer[SPI_BUFFER_SIZE];
-uint8_t dmaSpi4Buffer[SPI_BUFFER_SIZE];
+//uint8_t dmaSpi4Buffer[SPI_BUFFER_SIZE];
 /* USER CODE END 0 */
 
 SPI_HandleTypeDef hspi3;

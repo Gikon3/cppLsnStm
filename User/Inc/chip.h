@@ -5,14 +5,12 @@
 
 #define CHIP_ERRORS_MAX   64
 
-typedef enum ChipReset_
-{
+typedef enum {
   chipReset,
   chipUnreset
 } ChipReset;
 
-typedef enum ChipReconfig_
-{
+typedef enum {
   chipReconfYes,
   chipReconfNo
 } ChipReconfig;

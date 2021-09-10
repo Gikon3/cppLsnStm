@@ -61,13 +61,13 @@ osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+  .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for tskSpiService */
 osThreadId_t tskSpiServiceHandle;
 const osThreadAttr_t tskSpiService_attributes = {
   .name = "tskSpiService",
-  .stack_size = 128 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for tskServoService */
@@ -176,7 +176,7 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the queue(s) */
   /* creation of qData */
-  qDataHandle = osMessageQueueNew (32, sizeof(Vector), &qData_attributes);
+  qDataHandle = osMessageQueueNew (128, sizeof(Vector), &qData_attributes);
 
   /* creation of qCmdServo */
   qCmdServoHandle = osMessageQueueNew (4, sizeof(ServoControl), &qCmdServo_attributes);
@@ -205,7 +205,7 @@ void MX_FREERTOS_Init(void) {
   tskUsbTxCmdHandle = osThreadNew(startTskUsbTxCmd, NULL, &tskUsbTxCmd_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+  vTaskSuspend(tskSpiServiceHandle);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -224,11 +224,12 @@ void MX_FREERTOS_Init(void) {
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
+  osDelay (50 / portTICK_PERIOD_MS);
+  vTaskResume(tskSpiServiceHandle);
+
   servo_config();
   chip_config();
-  for(;;) {
-    osDelay(100);
-  }
+  vTaskDelete(NULL);
   /* USER CODE END StartDefaultTask */
 }
 
@@ -244,7 +245,7 @@ void startTskSpiService(void *argument)
   /* USER CODE BEGIN startTskSpiService */
   for(;;) {
     chip_msg_proc();
-    osDelay(20 / portTICK_PERIOD_MS);
+    osDelay(100 / portTICK_PERIOD_MS);
   }
   /* USER CODE END startTskSpiService */
 }
@@ -259,8 +260,7 @@ void startTskSpiService(void *argument)
 void startTskServoService(void *argument)
 {
   /* USER CODE BEGIN startTskServoService */
-  typedef enum RoatateDir_
-  {
+  typedef enum {
     dirNone,
     dirAnticlockwise,
     dirClockwise
@@ -319,20 +319,17 @@ void startTskUsbTxData(void *argument)
 {
   /* USER CODE BEGIN startTskUsbTxData */
   for(;;) {
-    Vector txData = make_vector_sz(16);
-    Vector qTxData = make_vector();
-    xQueueReceive(qDataHandle, &qTxData, portMAX_DELAY);
-    vector_append_vct(&txData, &qTxData);
-    vector_free(&qTxData);
-
-    while (xQueueReceive(qDataHandle, &qTxData, 0) == pdTRUE) {
-      vector_append_vct(&txData, &qTxData);
-      vector_free(&qTxData);
-    }
+    Vector txData;
+    xQueueReceive(qDataHandle, &txData, portMAX_DELAY);
     usb_send_data(txData.data, txData.size);
-
-    osDelay(1000 / portTICK_PERIOD_MS);
     vector_free(&txData);
+
+    while (xQueueReceive(qDataHandle, &txData, 0) == pdTRUE) {
+      usb_send_data(txData.data, txData.size);
+      vector_free(&txData);
+    }
+
+    osDelay(500 / portTICK_PERIOD_MS);
   }
   /* USER CODE END startTskUsbTxData */
 }

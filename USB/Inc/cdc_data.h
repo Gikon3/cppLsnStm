@@ -3,7 +3,7 @@
 
 #include <usbd_cdc.h>
 
-#define CDC_DATA_BUFIN_SIZE  2048
+#define CDC_DATA_BUFIN_SIZE  20480
 #define CDC_DATA_BUFOUT_SIZE 2048
 
 extern USBD_CDC_IfHandleType* const data_if;
