@@ -7,6 +7,7 @@
 #include "cmsis_os.h"
 #include "queue.h"
 #include <string.h>
+#include <math.h>
 
 #define SILENCE_THR   (500 / portTICK_PERIOD_MS)
 
@@ -184,7 +185,7 @@ static inline uint8_t* msg_process(SPI_HandleTypeDef* spi, DMA_HandleTypeDef* dm
       status = check_fp(&message);
       if (status == checkOk) {
         uint8_t angleCode[4] = { 0 };
-        uint16_t angle = servo_angle();
+        uint16_t angle = (float)lrint(servo_angle());
         angleCode[2] = angle >> 8;
         angleCode[3] = angle;
         vector_append_ar(&message, angleCode, &angleCode[sizeof(angleCode)]);
